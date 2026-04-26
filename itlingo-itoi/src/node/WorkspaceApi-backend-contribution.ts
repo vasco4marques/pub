@@ -12,7 +12,6 @@ const { Pool } = require('pg');
 const getDirName = require('path').dirname
 const crypto = require('crypto')
 
-
 //var getDirName = require('path').dirname;
 let requestIp = require('request-ip');
 
@@ -23,9 +22,10 @@ let requestIp = require('request-ip');
 
 const hostfs = "/tmp/theia/workspaces/";
 const hostroot = "/home/theia/pub/";
-const staticFolderLength = 76;
+const staticFolderLength = (hostfs + 'tmp/').length + 36 + '/Workspace-'.length; // 73: hostfs+"tmp/" + UUID(36) + "/Workspace-"
 const COM_KEY = "v8y/B?E(H+MbQeThWmZq4t7w!z$C&F)J";
-const itlingoCloudURL = "https://itlingocloud.herokuapp.com/";
+// const itlingoCloudURL = "https://itlingocloud.herokuapp.com/";
+const itlingoCloudURL = "http://localhost:8000/"
 //var itlingoCloudURL = "http://172.26.128.1:8000/";
 const currentEditors: {[ip:string]: Editor} = {};
 const workspaces: Map<string, string[]> = new Map<string, string[]>();
@@ -78,6 +78,7 @@ export class SwitchWSBackendContribution implements BackendApplicationContributi
 
         function fetchParamsFromEvent(event: nsfw.FileChangeEvent){
             let splitPaths = event.directory.split(path.sep);
+            if (splitPaths.length < 6) return undefined;
             let params = workspaces.get(splitPaths[5]) as string[];
             return params;
         }
@@ -267,10 +268,6 @@ export class SwitchWSBackendContribution implements BackendApplicationContributi
                 let params = decrypt(iv, token);
                 console.log("after decrypt");
                 console.log(params);
-                // var params = token ? getRemoteParams(token.toString()): ['itoi'];
-                // if (req.query.ws) params = [req.query.ws.toString()];
-                // if (req.query.user) params = params.concat( [req.query.user.toString()]);
-                // if (req.query.cp) params = params.concat( [req.query.cp.toString()]);
                 createWorkspace(ip, params);
                 res.statusCode = 301;
                 res.redirect('/');
@@ -397,8 +394,14 @@ function createWorkspace(ip:string, params:string[]){
 
 
     async function  createWatcher(path:string){
-        let watcher: nsfw.NSFW | undefined = await nsfw(fs.realpathSync(path), (events: nsfw.FileChangeEvent[]) => {
+        let watcher: nsfw.NSFW | undefined = await nsfw.default(fs.realpathSync(path), (events: nsfw.FileChangeEvent[]) => {
             for (const event of events) {
+                const fullpath = event.directory + '/' + (event as any).file;
+                try {
+                    if (fs.existsSync(fullpath) && fs.statSync(fullpath).isDirectory()) continue;
+                } catch (_) { /* path may no longer exist for DELETE events */ }
+                let params = fetchParamsFromEvent(event);
+                if (!params) continue;
                 if (event.action === nsfw.actions.CREATED) {
                     console.log('File', path, 'has been added');
                     addFileToDB( event);
@@ -429,4 +432,3 @@ function createWorkspace(ip:string, params:string[]){
 
     }
 }
-

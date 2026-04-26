@@ -17,7 +17,9 @@ import axios from 'axios';
 
 
 var path = '/home/theia/Workspaces';
-//var itlingoCloudURL = "https://itlingocloud.herokuapp.com/";
+var itlingoCloudURL = "https://itlingocloud.herokuapp.com/";
+var itlingoCloudURL = "http://localhost:8000/"
+var _switchingWorkspace = false;
 
 export const TheiaExampleExtensionCommand: Command = {
     id: 'TheiaExampleExtension.command',
@@ -124,7 +126,13 @@ export class TheiaSendBdFileUpdates extends AbstractViewContribution<GettingStar
         
     }
     onStart(app: FrontendApplication):void {
-         axios.get<JSON>('/getWorkspace',{},).then(
+         if (_switchingWorkspace) {
+             return;
+         }
+         _switchingWorkspace = true;
+
+         this.stateService.reachedState('ready').then(() => {
+             axios.get<JSON>('/getWorkspace',{},).then(
                  (response: any) => {
                      var prevRoot = this.workspaceService.tryGetRoots()[0] ;
                      
@@ -139,25 +147,18 @@ export class TheiaSendBdFileUpdates extends AbstractViewContribution<GettingStar
                         this.messageService.info("Setting Workspace to:" + response.data.foldername + " STATUS:" + response.status);
                         this.switchWorkspace(path);
                     }
-                    this.stateService.reachedState('ready').then(
-                        () => this.openView({ reveal: true })
-                    );
-                    //console.log("SetREADONLY");
+                    this.openView({ reveal: true });
                     this.readonly = response.data.readonly;
                     console.log(this.readonly);
                     this.setReadOnly();
+                    _switchingWorkspace = false;
                  }
              ).catch((error) => {
+                _switchingWorkspace = false;
                 //window.location.href = itlingoCloudURL;
              });
-
-        //  setInterval(() =>
-        //  {
-        //      axios.get<String>('/ping',{},);
-        // }, 60*1000);
-
+         });
 
         this.messageService.info("Welcome to ITLingo online IDE!");
     }
 }
-

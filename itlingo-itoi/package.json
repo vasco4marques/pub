@@ -9,13 +9,14 @@
     "src"
   ],
   "dependencies": {
-    "@theia/core": "latest",
-    "sprotty": "^0.12.0",
-    "sprotty-protocol": "^0.12.0",
+    "@theia/core": "1.60.2",
     "fs": "0.0.1-security",
     "log-timestamp": "^0.3.0",
+    "nsfw": "^2.3.1",
     "pg": "^8.7.3",
     "request-ip": "^2.1.3",
+    "sprotty": "^0.12.0",
+    "sprotty-protocol": "^0.12.0",
     "uuid": "^8.3.2"
   },
   "devDependencies": {
@@ -31,21 +32,23 @@
   "contributes": {
     "commands": [
       {
-          "command": "extended.git.clone",
-          "title": "Clone Git Repo",
-          "category": "Extended Git"
+        "command": "extended.git.clone",
+        "title": "Clone Git Repo",
+        "category": "Extended Git"
       },
       {
         "command": "extended.git.pull",
         "title": "Pull Git Repo",
         "category": "Extended Git"
-    },{
-      "command": "extended.git.push",
-      "title": "Push Git Repo",
-      "category": "Extended Git"
-  }],
-  "menus": {
-    "scm/title": [
+      },
+      {
+        "command": "extended.git.push",
+        "title": "Push Git Repo",
+        "category": "Extended Git"
+      }
+    ],
+    "menus": {
+      "scm/title": [
         {
           "command": "extended.git.clone",
           "group": "0_header@1",
@@ -66,9 +69,9 @@
         {
           "command": "extended.git.pull",
           "when": "editorHasSelection"
-        }]
+        }
+      ]
     }
-
   },
   "theiaExtensions": [
     {

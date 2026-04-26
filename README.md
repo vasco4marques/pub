@@ -1,78 +1,107 @@
 # itlingo-itoi
-The example of how to build the Theia-based applications with the itlingo-itoi.
 
-## Getting started
+A Theia-based browser IDE with custom language support for RSL and ASL (ITLingo), built as a monorepo with two packages:
 
-Please install all necessary [prerequisites](https://github.com/eclipse-theia/theia/blob/master/doc/Developing.md#prerequisites).
+- **itlingo-itoi** — A Theia extension providing workspace management, git operations (clone/pull/push), file synchronization with a PostgreSQL backend, and a custom widget UI.
+- **browser-app** — The Theia browser shell that bundles all extensions and plugins.
 
-## Running the browser example
+Language support for RSL and ASL is provided via VS Code extension plugins (`.vsix`), built from separate Langium-based repositories.
 
-    yarn start:browser
+## Prerequisites
 
-*or:*
+- [Node.js](https://nodejs.org/) >= 20 (tested with v20.19.x)
+- [Yarn](https://classic.yarnpkg.com/) 1.x
+- Python 3 with `setuptools` installed (needed by `node-gyp` for native modules)
+- [@vscode/vsce](https://github.com/microsoft/vscode-vsce) installed globally (for building `.vsix` plugins)
 
-    yarn rebuild:browser
-    cd browser-app
-    yarn start
+## Project Structure
 
-*or:* launch `Start Browser Backend` configuration from VS code.
+```
+pub/
+├── browser-app/        # Theia browser application (entry point)
+├── itlingo-itoi/       # Custom Theia extension (workspace, git, DB sync)
+├── plugins/            # VS Code extension plugins (.vsix, unpacked)
+├── package.json        # Root workspace config
+└── lerna.json
+```
 
-Open http://localhost:3000 in the browser.
+## Setup and Running
 
-## Running the Electron example
+### 1. Build the RSL and ASL language extensions
 
-    yarn start:electron
+Clone and build each extension to produce `.vsix` packages:
 
-*or:*
+```bash
+git clone https://github.com/genlike/rsl-vscode-extension.git
+cd rsl-vscode-extension
+yarn install
+vsce package --allow-missing-repository
+cd ..
 
-    yarn rebuild:electron
-    cd electron-app
-    yarn start
+git clone https://github.com/genlike/asl-vscode-extension.git
+cd asl-vscode-extension
+yarn install
+vsce package --allow-missing-repository
+cd ..
+```
 
-*or:* launch `Start Electron Backend` configuration from VS code.
+> **Note:** If `vsce` complains about both `.vscodeignore` and `"files"` in `package.json`, delete the `.vscodeignore` file and retry.
 
+### 2. Install the plugins
 
-## Developing with the browser example
+Create the `plugins/` directory and unpack the `.vsix` files:
 
-Start watching all packages, including `browser-app`, of your application with
+```bash
+mkdir -p plugins
 
-    yarn watch
+mkdir -p plugins/rsl-vscode-extension
+unzip rsl-vscode-extension/rsl-vscode-extension-*.vsix -d plugins/rsl-vscode-extension
 
-*or* watch only specific packages with
+mkdir -p plugins/asl-vscode-extension
+unzip asl-vscode-extension/asl-vscode-extension-*.vsix -d plugins/asl-vscode-extension
+```
 
-    cd itlingo-itoi
-    yarn watch
+### 3. Install dependencies and build
 
-and the browser example.
+From the `pub/` root:
 
-    cd browser-app
-    yarn watch
+```bash
+yarn install
+cd browser-app
+yarn theia build
+```
 
-Run the example as [described above](#Running-the-browser-example)
-## Developing with the Electron example
+> **Note:** The `@theia/*` dependencies in `browser-app/package.json` and `itlingo-itoi/package.json` should be pinned to a consistent version (e.g., `1.60.2`) to avoid version mismatches. The `@theia/git` package was deprecated at `1.60.2`, so all other Theia packages must match that version.
 
-Start watching all packages, including `electron-app`, of your application with
+### 4. Start the IDE
 
-    yarn watch
+```bash
+cd browser-app
+yarn theia start --hostname 0.0.0.0 --port 3000 --plugins=local-dir:../plugins
+```
 
-*or* watch only specific packages with
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-    cd itlingo-itoi
-    yarn watch
+## Development
 
-and the Electron example.
+Watch the custom extension for changes:
 
-    cd electron-app
-    yarn watch
+```bash
+cd itlingo-itoi
+yarn watch
+```
 
-Run the example as [described above](#Running-the-Electron-example)
+In a separate terminal, watch and rebuild the browser app:
 
-## Publishing itlingo-itoi
+```bash
+cd browser-app
+yarn watch
+```
 
-Create a npm user and login to the npm registry, [more on npm publishing](https://docs.npmjs.com/getting-started/publishing-npm-packages).
+## Environment Variables
 
-    npm login
+- **CONSTRING** — PostgreSQL connection string for the backend file synchronization feature. If not set, the IDE will start but database-related features will be unavailable.
 
-Publish packages with lerna to update versions properly across local packages, [more on publishing with lerna](https://github.com/lerna/lerna#publish).
+## Docker (Legacy)
 
-    npx lerna publish
+The `itlingo-itoi` repository contains a Dockerfile for containerized deployment. **The Dockerfile is currently outdated** — it references Xtext-based artifacts (`server/mydsl/bin/`, JAR files, `start-ls-itlingo` scripts) that no longer exist since the language extensions migrated to Langium. The Dockerfile needs to be updated to reflect the Langium-based build process described above.
