@@ -17,9 +17,13 @@ import axios from 'axios';
 
 
 var path = '/home/theia/Workspaces';
-var itlingoCloudURL = "https://itlingocloud.herokuapp.com/";
-var itlingoCloudURL = "http://localhost:8000/"
+/** ITLingo Cloud base URL from backend env — loaded from GET /itoi/config */
+var itlingoCloudURL = '';
 var _switchingWorkspace = false;
+
+function logFrontend(...args: unknown[]): void {
+    console.log('[ITOI:FRONTEND]', ...args);
+}
 
 export const TheiaExampleExtensionCommand: Command = {
     id: 'TheiaExampleExtension.command',
@@ -131,32 +135,66 @@ export class TheiaSendBdFileUpdates extends AbstractViewContribution<GettingStar
          }
          _switchingWorkspace = true;
 
-         this.stateService.reachedState('ready').then(() => {
-             axios.get<JSON>('/getWorkspace',{},).then(
-                 (response: any) => {
-                     var prevRoot = this.workspaceService.tryGetRoots()[0] ;
-                     
-                    if (prevRoot != undefined) {
-                        if (!this.compareFoldernames(response.data.foldername.toString(), prevRoot.resource.path.toString())){
-                            path = '' + response.data.foldername;
-                            this.messageService.info("Changing Workspace to:" + response.data.foldername + " PREV:" + prevRoot.resource.path);
-                            this.switchWorkspace(path);
-                        }
-                    } else {
-                        path = '' + response.data.foldername;
-                        this.messageService.info("Setting Workspace to:" + response.data.foldername + " STATUS:" + response.status);
-                        this.switchWorkspace(path);
-                    }
-                    this.openView({ reveal: true });
-                    this.readonly = response.data.readonly;
-                    console.log(this.readonly);
-                    this.setReadOnly();
-                    _switchingWorkspace = false;
+         this.stateService.reachedState('ready').then(async () => {
+             try {
+                 const cfg = await axios.get<{ itlingoCloudUrl: string }>('/itoi/config');
+                 itlingoCloudURL = cfg.data.itlingoCloudUrl ?? '';
+                 logFrontend('Loaded /itoi/config itlingoCloudUrl=%s', itlingoCloudURL);
+             } catch (cfgErr: unknown) {
+                 const msg = cfgErr instanceof Error ? cfgErr.message : String(cfgErr);
+                 logFrontend('/itoi/config failed — using empty cloud URL: %s', msg);
+             }
+
+             try {
+                 const response = await axios.get<{ foldername: string; readonly: boolean }>('/getWorkspace', {});
+                 const prevRoot = this.workspaceService.tryGetRoots()[0];
+                 logFrontend(
+                     'getWorkspace OK status=%s foldername=%s readonly=%s',
+                     response.status,
+                     response.data.foldername,
+                     response.data.readonly
+                 );
+
+                 if (prevRoot !== undefined) {
+                     const prevPath = prevRoot.resource.path.toString();
+                     const nextPath = response.data.foldername.toString();
+                     if (!this.compareFoldernames(nextPath, prevPath)) {
+                         path = '' + response.data.foldername;
+                         logFrontend('workspace switch from=%s to=%s', prevPath, nextPath);
+                         this.messageService.info(
+                             'Changing Workspace to:' + response.data.foldername + ' PREV:' + prevPath
+                         );
+                         this.switchWorkspace(path);
+                     } else {
+                         logFrontend('workspace unchanged (same folder suffix) path=%s', nextPath);
+                     }
+                 } else {
+                     path = '' + response.data.foldername;
+                     logFrontend('initial workspace open folder=%s status=%s', path, response.status);
+                     this.messageService.info(
+                         'Setting Workspace to:' + response.data.foldername + ' STATUS:' + response.status
+                     );
+                     this.switchWorkspace(path);
                  }
-             ).catch((error) => {
-                _switchingWorkspace = false;
-                //window.location.href = itlingoCloudURL;
-             });
+                 this.openView({ reveal: true });
+                 this.readonly = response.data.readonly;
+                 logFrontend('readonly mode=%s (editors will be read-only=%s)', this.readonly, this.readonly);
+                 this.setReadOnly();
+                 _switchingWorkspace = false;
+             } catch (error: unknown) {
+                 _switchingWorkspace = false;
+                 const msg =
+                     error && typeof error === 'object' && 'message' in error
+                         ? (error as Error).message
+                         : String(error);
+                 const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+                 logFrontend(
+                     'getWorkspace FAILED — no workspace session? status=%s message=%s (user may need /createTempWorkspace first)',
+                     status,
+                     msg
+                 );
+                 this.logger.error(`[ITOI:FRONTEND] getWorkspace error: ${msg}`);
+             }
          });
 
         this.messageService.info("Welcome to ITLingo online IDE!");

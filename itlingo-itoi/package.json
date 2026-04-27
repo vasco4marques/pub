@@ -10,6 +10,7 @@
   ],
   "dependencies": {
     "@theia/core": "1.60.2",
+    "dotenv": "^16.4.5",
     "fs": "0.0.1-security",
     "log-timestamp": "^0.3.0",
     "nsfw": "^2.3.1",

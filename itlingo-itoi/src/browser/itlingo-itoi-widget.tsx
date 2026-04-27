@@ -28,6 +28,10 @@ import { WindowService } from '@theia/core/lib/browser/window/window-service';
 import { nls } from '@theia/core/lib/common/nls';
 import axios from 'axios';
 
+function logFrontend(...args: unknown[]): void {
+    console.log('[ITOI:FRONTEND]', ...args);
+}
+
 /**
  * Default implementation of the `GettingStartedWidget`.
  * The widget is displayed when there are currently no workspaces present.
@@ -500,46 +504,60 @@ export class GettingStartedWidget extends ReactWidget {
     }
 
     protected doSetupRSL = () => {
-        axios.get<JSON>('/setupRSL',{},).then(() => { 
-            
-            this.messageService.info("Finished setting up RSL files!");
-     });
-        
-    }
+        axios.get<JSON>('/setupRSL', {}).then(() => {
+            logFrontend('setupRSL finished OK');
+            this.messageService.info('Finished setting up RSL files!');
+        }).catch((err: unknown) => {
+            logFrontend('setupRSL FAILED', err);
+            this.messageService.error('Setup RSL failed — check backend logs ([ITOI:SETUP])');
+        });
+    };
 
     protected doSetupASL = () => {
-        axios.get<JSON>('/setupASL',{},).then(() => { 
-            this.messageService.info("Finished setting up ASL files!");
+        axios.get<JSON>('/setupASL', {}).then(() => {
+            logFrontend('setupASL finished OK');
+            this.messageService.info('Finished setting up ASL files!');
+        }).catch((err: unknown) => {
+            logFrontend('setupASL FAILED', err);
+            this.messageService.error('Setup ASL failed — check backend logs ([ITOI:SETUP])');
         });
-    }
-    
+    };
+
     protected doCustomSetup = () => {
-        axios.get<JSON>('/setupCustom',{},).then((listOfFiles:any) => {
-            let selection:QuickPickItem[] = []
-            console.log("CustomSetupTheia");
-            console.log(listOfFiles);
-           
-            for(const ele of listOfFiles.data.namelist){
-                console.log(ele);
-                let newQuickPickItem: QuickPickItem = { 
-                    label: "File: " + ele.name + " Type: " + ele.type,
+        axios.get<JSON>('/setupCustom', {}).then((listOfFiles: any) => {
+            logFrontend('setupCustom response', listOfFiles?.data);
+            const selection: QuickPickItem[] = [];
+            const namelist = listOfFiles?.data?.namelist;
+            if (!Array.isArray(namelist)) {
+                logFrontend('setupCustom: invalid response (expected data.namelist array)');
+                this.messageService.warn('Could not load file list from ITLingo Cloud — check backend and cloud URL.');
+                return;
+            }
+            for (const ele of namelist) {
+                const newQuickPickItem: QuickPickItem = {
+                    label: 'File: ' + ele.name + ' Type: ' + ele.type,
                     id: ele.id,
                     detail: ele.name
-                }
+                };
                 selection.push(newQuickPickItem);
             }
-            
-            this.quickInputService.showQuickPick(selection, { 
+
+            this.quickInputService.showQuickPick(selection, {
                 hideCheckAll: false,
                 canSelectMany: true
             }).then((value) => {
-                axios.get<JSON>('/setupCustomAccepted?fileid='+value?.id +'&filename=' + value?.detail,{ data: value?.id},).then(() => {
-                    this.messageService.info("Finished setting up itlingo cloud files!");
+                axios.get<JSON>('/setupCustomAccepted?fileid=' + value?.id + '&filename=' + value?.detail, { data: value?.id }).then(() => {
+                    logFrontend('setupCustomAccepted OK fileid=%s', value?.id);
+                    this.messageService.info('Finished setting up itlingo cloud files!');
+                }).catch((err: unknown) => {
+                    logFrontend('setupCustomAccepted FAILED', err);
+                    this.messageService.error('Download failed — check backend logs');
                 });
             });
-            
-     });
-        
-    }
+        }).catch((err: unknown) => {
+            logFrontend('setupCustom FAILED', err);
+            this.messageService.error('Setup custom failed — check backend / cloud connectivity');
+        });
+    };
 
 }
